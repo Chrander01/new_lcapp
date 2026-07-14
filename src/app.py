@@ -323,222 +323,146 @@ server = app.server
 # fig = px.bar(df, x="Fruit", y="Amount", color="City", barmode="group")
 
 
-def drawText():
-    return html.Div([
-        dbc.Card(
-            dbc.CardBody([
-                html.Div([
-                    html.H4(
-                        "Goals-Based Investing: Surplus Optimization & Risk Premium Calculations"),
-                ], style={'textAlign': 'center'})
-            ])
-        ),
-    ])
-
-
-def drawTextPlain(text_inp):
-    textinput = text_inp
-    return html.Div([
-        dbc.Card(
-            dbc.CardBody([
-                html.Div([
-                    html.H6(textinput),
-                ], style={'textAlign': 'left'})
-            ])
-        ),
-    ])
-
-
 def drawText2(title_inp, text_inp, text2_inp):
-    titleinput = title_inp
-    textinput = text_inp
-    text2input = text2_inp
-    return html.Div([
-        dbc.Card(
-            dbc.CardBody([
-                html.Div([
-                    html.H5(titleinput),
-                    html.H6(textinput),
-                    html.H6(text2input),
-                ], style={'textAlign': 'left'})
-            ])
-        ),
-    ])
+    children = [html.H5(title_inp, className='fw-bold')]
+    if text_inp:
+        children.append(html.P(text_inp))
+    if text2_inp:
+        children.append(html.P(text2_inp, className='text-muted small mb-0'))
+    return html.Div(children, className='mb-3')
 
 
 p_title1 = "Extending Sharpe and Tint (1990) Surplus Optimization to GBI"
 p_title2 = "Research article at SSRN: https://papers.ssrn.com/sol3/papers.cfm?abstract_id=4357369"
 p_title3 = "© 2024 VS Quantitative Solutions LLC, All Rights Reserved."
 
+# style for page headers: left-aligned with a left accent border matching the
+# sidebar nav pills' active color, for contrast against the white page background
+PAGE_HEADER_STYLE = {
+    "textAlign": "left",
+    "borderLeft": "5px solid #2C3E50",
+    "paddingLeft": "15px",
+    "fontWeight": "bold",
+}
+
+paper_attribution = dbc.Row([
+    dbc.Col([
+        drawText2(p_title1, "", ""),
+    ], width=12),
+], className='mb-4')
+
 page_ef = html.Div([
     html.H3(children='Efficient Frontier',
-            style={'textAlign': 'center'}),
-    html.A("Research article at SSRN: https://papers.ssrn.com/sol3/papers.cfm?abstract_id=4357369",
-           href='https://papers.ssrn.com/sol3/papers.cfm?abstract_id=4357369', target="_blank"),
-    dbc.Card(
-        dbc.CardBody([
-            dbc.Row([
-                dbc.Col([
-                    drawText2(p_title1,
-                              "", p_title3)
-                ], width=12),
-            ], align='center'),
-            html.Br(),
-            dbc.Row([
-                dbc.Col([
-                    dcc.Graph(figure=fig_mc)
-                ], width=6),
-                dbc.Col([
-                    drawText2('Markowitz Mean-Variance Analysis',
-                              'Using Monte Carlo to simulate random portfolio weights, this graph shows various risk and return combinations that can be achieved. They are shown here primarily to illustrate the starting point after which the liabilities and surlus are introduced. The investor could of course use their own desired asset return assumptions to represent the market portfolios available.',
-                              '')
-                ], width=6),
-            ], align='center'),
-            html.Br(),
-            dbc.Row([
-                dbc.Col([
-                    dcc.Graph(figure=fig_ef)
-                ], width=6),
-                dbc.Col([
-                    drawText2('Efficient Frontier', 'This grapht then shows the efficient frontier of possible returns, which "dominates" all others.',
-                              '')
-                ], width=6),
-            ], align='center'),
-            html.Br(),
-        ]))])
+            style=PAGE_HEADER_STYLE),
+    html.P("This web application illustrates the calculations in practice of using a new goals-based investing model.",
+           style={'textAlign': 'left', 'color': 'grey', 'paddingLeft': '15px'}),
+    html.Hr(className='mt-2 mb-4'),
+    paper_attribution,
+    dbc.Row([
+        dbc.Col([
+            dcc.Graph(figure=fig_mc)
+        ], width=6),
+        dbc.Col([
+            drawText2('Markowitz Mean-Variance Analysis',
+                      'Using Monte Carlo to simulate random portfolio weights, this graph shows various risk and return combinations that can be achieved. They are shown here primarily to illustrate the starting point after which the liabilities and surlus are introduced. The investor could of course use their own desired asset return assumptions to represent the market portfolios available.',
+                      '')
+        ], width=6),
+    ], align='center', className='mb-4'),
+    dbc.Row([
+        dbc.Col([
+            dcc.Graph(figure=fig_ef)
+        ], width=6),
+        dbc.Col([
+            drawText2('Efficient Frontier', 'This grapht then shows the efficient frontier of possible returns, which "dominates" all others.',
+                      '')
+        ], width=6),
+    ], align='center'),
+])
 
 page_liability = html.Div([
     html.H3(children='Tracing the Liability Distribution',
-            style={'textAlign': 'center'}),
-    html.A("Research article at SSRN: https://papers.ssrn.com/sol3/papers.cfm?abstract_id=4357369",
-           href='https://papers.ssrn.com/sol3/papers.cfm?abstract_id=4357369', target="_blank"),
-    dbc.Card(
-        dbc.CardBody([
-            dbc.Row([
-                dbc.Col([
-                    drawText2(p_title1,
-                              "", p_title3)
-                ], width=12),
-            ], align='center'),
-            html.Br(),
-            dbc.Row([dash_liab_table]),
-            html.Br(),
-            dbc.Row([
-                dbc.Col([dash_lirr_table], width=6),
-                dbc.Col([
-                    html.I(children='<-- These become the inputs that flow through to the first tab', style={
-                        'textAlign': 'left'})])]),
-
-            html.Br(),
-            dbc.Row([
-                dbc.Col([
-                    dcc.Graph(figure=surf_fig),
-                    html.Br(),
-                    html.Div([html.H6(
-                        children='Notes: n=2,000; probability distribution of present value discount rate of liabilities based on annual cashflows and residual value above.', style={'textAlign': 'left'})])], width=6),
-                dbc.Col([
-                    drawText2('Tracing the Liability Probability Densities using Monte Carlo', 'The implied discount rate of the stated values above has a mean of ~.05 and a standard deviation of ~.06. These values were chosen for simplicity to illustrate that expected increases of .05 every year will clearly lead to an average expected return starting today of .05. The individual yearly standard deviations of .25 result in a combined standard deviation (relative to starting wealth) of .06 as stated. Correlation between assets and liabilities is set to 1.0 to reflect that an investor will increase or decrease future spending outlays based on actual asset returns. The probability distribution of the liability is traced out using Monte Carlo. The surface to the left reflects the fact that this distribution is constant across the efficient frontier. So while asset volatility fluctuates, liability volatility is constant across the range of the efficient frontier.',
-                              '')
-                ], width=6),
-            ], align='center'),
-            html.Br(),
-            dbc.Row([
-                dbc.Col([
-                    dcc.Graph(figure=fig_efpx)
-                ], width=6),
-                dbc.Col([
-                    dcc.Graph(figure=fig_efpx_10)
-                ], width=6),
-            ], align='center'),
-            html.Br(),
-            dbc.Row([
-                dbc.Col([
-                    html.Div([
-                        html.Div([dbc.Card(
-                            dbc.CardBody([html.H5(
-                                'Time Horizon Impacts on Efficient Frontier'),
-                                html.P('The duration of liabilities is matched to the duration of the assets. In this case, we are using an equivalent total of 5 years for each. This has an important impact on the efficient frontier given an increased time horizon has the effect of increasing the probability of a positive outcome over the total period. This can be observed, visually, by the amount of observations that land above the point of zero returns as the time horizon increases (i.e., in the graph on the right). This is also an area where the model complexity could be increased in order to more realistically match time horizon effects. For example, a weighting of the dollar duration of liabilities might be more precise or even more interestingly, multi-period optimizations, such as dynamic programming. However, this paper focuses on the methodology of combining asset and liability returns rather than fine tuning the liability calculations. In addition, there has been substantial research in the fields of dynamic programming that could likely be applied to extend this model.'),
-                                html.P(''),
-                                html.P(
-                                    ''),
-                                html.P(''),
-
-                                html.P('')])),
-                        ])
-                    ])], width=12),
-            ])])
-    )
+            style=PAGE_HEADER_STYLE),
+    html.P("This web application illustrates the calculations in practice of using a new goals-based investing model.",
+           style={'textAlign': 'left', 'color': 'grey', 'paddingLeft': '15px'}),
+    html.Hr(className='mt-2 mb-4'),
+    paper_attribution,
+    dbc.Row([dash_liab_table], className='mb-4'),
+    dbc.Row([
+        dbc.Col([dash_lirr_table], width=6),
+        dbc.Col([
+            html.I(children='<-- These become the inputs that flow through to the first tab', className='text-muted', style={
+                'textAlign': 'left'})])
+    ], className='mb-4'),
+    dbc.Row([
+        dbc.Col([
+            dcc.Graph(figure=surf_fig),
+            html.P('Notes: n=2,000; probability distribution of present value discount rate of liabilities based on annual cashflows and residual value above.', className='text-muted small'),
+        ], width=6),
+        dbc.Col([
+            drawText2('Tracing the Liability Probability Densities using Monte Carlo', 'The implied discount rate of the stated values above has a mean of ~.05 and a standard deviation of ~.06. These values were chosen for simplicity to illustrate that expected increases of .05 every year will clearly lead to an average expected return starting today of .05. The individual yearly standard deviations of .25 result in a combined standard deviation (relative to starting wealth) of .06 as stated. Correlation between assets and liabilities is set to 1.0 to reflect that an investor will increase or decrease future spending outlays based on actual asset returns. The probability distribution of the liability is traced out using Monte Carlo. The surface to the left reflects the fact that this distribution is constant across the efficient frontier. So while asset volatility fluctuates, liability volatility is constant across the range of the efficient frontier.',
+                      '')
+        ], width=6),
+    ], align='center', className='mb-4'),
+    dbc.Row([
+        dbc.Col([
+            dcc.Graph(figure=fig_efpx)
+        ], width=6),
+        dbc.Col([
+            dcc.Graph(figure=fig_efpx_10)
+        ], width=6),
+    ], align='center', className='mb-4'),
+    dbc.Row([
+        dbc.Col([
+            html.H5('Time Horizon Impacts on Efficient Frontier', className='fw-bold'),
+            html.P('The duration of liabilities is matched to the duration of the assets. In this case, we are using an equivalent total of 5 years for each. This has an important impact on the efficient frontier given an increased time horizon has the effect of increasing the probability of a positive outcome over the total period. This can be observed, visually, by the amount of observations that land above the point of zero returns as the time horizon increases (i.e., in the graph on the right). This is also an area where the model complexity could be increased in order to more realistically match time horizon effects. For example, a weighting of the dollar duration of liabilities might be more precise or even more interestingly, multi-period optimizations, such as dynamic programming. However, this paper focuses on the methodology of combining asset and liability returns rather than fine tuning the liability calculations. In addition, there has been substantial research in the fields of dynamic programming that could likely be applied to extend this model.'),
+        ], width=12),
+    ]),
 ])
 
 page_surplus = html.Div([
     html.H3(children='Surplus Optimization along Efficient Frontier',
-            style={'textAlign': 'center'}),
-    html.A("Research article at SSRN: https://papers.ssrn.com/sol3/papers.cfm?abstract_id=4357369",
-           href='https://papers.ssrn.com/sol3/papers.cfm?abstract_id=4357369', target="_blank"),
-    dbc.Card(
-        dbc.CardBody([
-            dbc.Row([
-                dbc.Col([
-                    drawText2(p_title1,
-                              "", p_title3)
-                ], width=12),
-            ], align='center'),
-            html.Br(),
-            dbc.Row([
-                dbc.Col([
-                    html.Div([
-                        html.H6(children='Discount Rate at which Future Spending Liabilities = PV of Current Net Assets (%)', style={
-                            'textAlign': 'left'})]),
-                    html.Br(),
-                    dcc.Dropdown([float(5.0), float(6.0), float(7.0)], float(5.0),
-                                 id='dropdown-selection')], width=4),
+            style=PAGE_HEADER_STYLE),
+    html.P("This web application illustrates the calculations in practice of using a new goals-based investing model.",
+           style={'textAlign': 'left', 'color': 'grey', 'paddingLeft': '15px'}),
+    html.Hr(className='mt-2 mb-4'),
+    paper_attribution,
+    dbc.Row([
+        dbc.Col([
+            html.P('Discount Rate at which Future Spending Liabilities = PV of Current Net Assets (%)',
+                   className='small text-muted mb-1', style={'textAlign': 'left'}),
+            dcc.Dropdown([float(5.0), float(6.0), float(7.0)], float(5.0),
+                         id='dropdown-selection')], width=4),
 
-                dbc.Col([
-                    html.Div([
-                        html.H6(children='Spending Flexibility of Liabilities (σ) using Goal Ranges & Monte Carlo (next page) ', style={
-                            'textAlign': 'left'})]),
-                    html.Br(),
-                    dcc.Dropdown([float(5.0), float(6.0), float(10.0)], float(6.0),
-                                 id='dropdown-selection2')], width=4),
-            ], align='left'),
-            html.Br(),
-            dbc.Row([
-                dbc.Col([
-                    dcc.Graph(id='graph-content'),
-                    html.Br(),
-                    html.Div([html.H6(
-                        children='Notes: *Nearest discrete portfolio; n=2,000; z-score = 1.65, equating to 95% probability of surplus value; time horizon = 5 years; correlation(assets, liabilities) = 1.0', style={'textAlign': 'left'})])], width=6),
-                dbc.Col([
-                    html.Div([
-
-                        html.Div([dbc.Card(
-                            dbc.CardBody([html.H5(
-                                'Surplus Optimization on the Efficient Frontier'),
-                                html.P('The mean liability and risk-adjusted surplus curves are plotted against a typical efficient frontier. This allows you see, visually, where optimal surplus intersects with the efficient frontier--and therefore, identifies the optimal portfolio (i.e., optimal asset allocation).'),
-                                html.P('The mean liability discount rate is the rate (i.e., the expected value, E(x)) at which future spending equals the current value of net assets. In other words, it is the return that would need to be generated in order to satisfy future liabilities (spending goals).'),
-                                html.P(
-                                    'A full probability density function is traced out via Monte Carlo (details on next tab) to represent these future liabilities--which provides both this mean, but also the standard deviation of the discount rate that equates to future spending liabilties.'),
-                                html.P('Using this probability distribution for future liabilities, we can then calculate a risk-adjusted surplus value that not only subtracts future spending from future asset returns, but also incorporates risk, which is mediated by the standard deviation of liabilities (i.e., spending flexibility), a correlation term of 1.0, and a z-score for surplus, which represents the probability threshold that surplus will equal at least zero (i.e., set to 0.95 or 0.99 certainty). These additional paramters are what create the dynamic shape (and importantly, the assymetric risk profile) of both risk-adjusted surplus and the utility function calculations below. The risk-adjusted surplus computation is an extension of concepts developed by Sharpe and Tint (1990) and is described in detail in the accompanying research article.'),
-                                # This approach uses a 1.0 correlation between asset and liability paths through time as spending is increased or decreased in proportion to asset returns.
-
-                                # html.P('Liability probabilities are set by standard deviations that allow the investor to create the discretionary level of a goal (i.e., minimum food and shelter needs might be set at a zero standard deviation whereas a future vacation home could have a flexibly value of $1 - $3 million based on two standard deviations, which an investor could understand as within 95% of cases according to the empirical rule)'),
-                                html.P('The highest risk-adjusted surplus reflects the optimal portfolio, which takes into account both stochastic return and stochastic future liabilities in a single-period setting--inputs are ideally revised until optimal surplus equals zero at a prescribed z-score.')])),
-                        ])
-                    ])], width=6),
-            ], align='center'),
-            html.Br(),
-            dbc.Row([
-                dbc.Col([
-                    dcc.Graph(id='graph-content2')
-                ], width=6),
-                dbc.Col([
-                    drawText2('Implied (Idiosyncratic) Investor Utility Function', "After a model for risk-adjusted surplus was formulated, it eventually became apparent that it could be plotted against a simple arithmetic mean surplus value to arrive at a direct measure an investor's idiosyncratic utility function. In the author's opinion, this is an improved and more direct measure of utility, rather than typical, stylized approaches or approaches that infer utility based on a presumed value of its first derivative. The resulting utility function is very comparable to the shape of traditional, stylized utility functions once you disregard results that exceed the optimized surplus level. Interesting shape dynamics (i.e., convex, concave, kinked, etc.) can also be observed as assumptions are changed.",
-                              '')
-                ], width=6),
-            ], align='center'),
-            html.Br(),
-        ]), color='white'
-    )
+        dbc.Col([
+            html.P('Spending Flexibility of Liabilities (σ) using Goal Ranges & Monte Carlo (next page)',
+                   className='small text-muted mb-1', style={'textAlign': 'left'}),
+            dcc.Dropdown([float(5.0), float(6.0), float(10.0)], float(6.0),
+                         id='dropdown-selection2')], width=4),
+    ], align='left', className='mb-4'),
+    dbc.Row([
+        dbc.Col([
+            dcc.Graph(id='graph-content'),
+            html.P('Notes: *Nearest discrete portfolio; n=2,000; z-score = 1.65, equating to 95% probability of surplus value; time horizon = 5 years; correlation(assets, liabilities) = 1.0', className='text-muted small'),
+        ], width=6),
+        dbc.Col([
+            html.H5('Surplus Optimization on the Efficient Frontier', className='fw-bold'),
+            html.P('The mean liability and risk-adjusted surplus curves are plotted against a typical efficient frontier. This allows you see, visually, where optimal surplus intersects with the efficient frontier--and therefore, identifies the optimal portfolio (i.e., optimal asset allocation).'),
+            html.P('The mean liability discount rate is the rate (i.e., the expected value, E(x)) at which future spending equals the current value of net assets. In other words, it is the return that would need to be generated in order to satisfy future liabilities (spending goals).'),
+            html.P(
+                'A full probability density function is traced out via Monte Carlo (details on next tab) to represent these future liabilities--which provides both this mean, but also the standard deviation of the discount rate that equates to future spending liabilties.'),
+            html.P('Using this probability distribution for future liabilities, we can then calculate a risk-adjusted surplus value that not only subtracts future spending from future asset returns, but also incorporates risk, which is mediated by the standard deviation of liabilities (i.e., spending flexibility), a correlation term of 1.0, and a z-score for surplus, which represents the probability threshold that surplus will equal at least zero (i.e., set to 0.95 or 0.99 certainty). These additional paramters are what create the dynamic shape (and importantly, the assymetric risk profile) of both risk-adjusted surplus and the utility function calculations below. The risk-adjusted surplus computation is an extension of concepts developed by Sharpe and Tint (1990) and is described in detail in the accompanying research article.'),
+            html.P('The highest risk-adjusted surplus reflects the optimal portfolio, which takes into account both stochastic return and stochastic future liabilities in a single-period setting--inputs are ideally revised until optimal surplus equals zero at a prescribed z-score.'),
+        ], width=6),
+    ], align='center', className='mb-4'),
+    dbc.Row([
+        dbc.Col([
+            dcc.Graph(id='graph-content2')
+        ], width=6),
+        dbc.Col([
+            drawText2('Implied (Idiosyncratic) Investor Utility Function', "After a model for risk-adjusted surplus was formulated, it eventually became apparent that it could be plotted against a simple arithmetic mean surplus value to arrive at a direct measure an investor's idiosyncratic utility function. In the author's opinion, this is an improved and more direct measure of utility, rather than typical, stylized approaches or approaches that infer utility based on a presumed value of its first derivative. The resulting utility function is very comparable to the shape of traditional, stylized utility functions once you disregard results that exceed the optimized surplus level. Interesting shape dynamics (i.e., convex, concave, kinked, etc.) can also be observed as assumptions are changed.",
+                      '')
+        ], width=6),
+    ], align='center'),
 ])
 
 
@@ -550,7 +474,10 @@ SIDEBAR_STYLE = {
     "bottom": 0,
     "width": "16rem",
     "padding": "2rem 1rem",
-    "background-color": "#f8f9fa",
+    "background-color": "#2C3E50",
+    "color": "#ECF0F1",
+    "display": "flex",
+    "flexDirection": "column",
 }
 
 # the styles for the main content position it to the right of the sidebar and
@@ -579,7 +506,21 @@ sidebar = html.Div(
             ],
             vertical=True,
             pills=True,
+            style={
+                "--bs-nav-link-color": "#ECF0F1",
+                "--bs-nav-link-hover-color": "#FFFFFF",
+                "--bs-nav-pills-link-active-bg": "#3498DB",
+                "--bs-nav-pills-link-active-color": "#FFFFFF",
+            },
         ),
+        html.Div([
+            html.Hr(),
+            html.P(p_title3, className='small mb-1',
+                   style={'color': '#B0BEC5'}),
+            html.A("Research article at SSRN",
+                   href='https://papers.ssrn.com/sol3/papers.cfm?abstract_id=4357369', target="_blank",
+                   style={'fontSize': '0.75rem', 'textDecoration': 'none', 'color': '#ECF0F1'}),
+        ], style={'marginTop': 'auto'}),
     ],
     style=SIDEBAR_STYLE,
 )

@@ -334,7 +334,7 @@ def drawText2(title_inp, text_inp, text2_inp):
 
 p_title1 = "Extending Sharpe and Tint (1990) Surplus Optimization to GBI"
 p_title2 = "Research article at SSRN: https://papers.ssrn.com/sol3/papers.cfm?abstract_id=4357369"
-p_title3 = "© 2024 VS Quantitative Solutions LLC, All Rights Reserved."
+p_title3 = "© 2024-2026 VS Quantitative Solutions LLC, All Rights Reserved."
 
 # style for page headers: left-aligned with a left accent border matching the
 # sidebar nav pills' active color, for contrast against the white page background
@@ -413,7 +413,8 @@ page_liability = html.Div([
     ], align='center', className='mb-4'),
     dbc.Row([
         dbc.Col([
-            html.H5('Time Horizon Impacts on Efficient Frontier', className='fw-bold'),
+            html.H5('Time Horizon Impacts on Efficient Frontier',
+                    className='fw-bold'),
             html.P('The duration of liabilities is matched to the duration of the assets. In this case, we are using an equivalent total of 5 years for each. This has an important impact on the efficient frontier given an increased time horizon has the effect of increasing the probability of a positive outcome over the total period. This can be observed, visually, by the amount of observations that land above the point of zero returns as the time horizon increases (i.e., in the graph on the right). This is also an area where the model complexity could be increased in order to more realistically match time horizon effects. For example, a weighting of the dollar duration of liabilities might be more precise or even more interestingly, multi-period optimizations, such as dynamic programming. However, this paper focuses on the methodology of combining asset and liability returns rather than fine tuning the liability calculations. In addition, there has been substantial research in the fields of dynamic programming that could likely be applied to extend this model.'),
         ], width=12),
     ]),
@@ -445,7 +446,8 @@ page_surplus = html.Div([
             html.P('Notes: *Nearest discrete portfolio; n=2,000; z-score = 1.65, equating to 95% probability of surplus value; time horizon = 5 years; correlation(assets, liabilities) = 1.0', className='text-muted small'),
         ], width=6),
         dbc.Col([
-            html.H5('Surplus Optimization on the Efficient Frontier', className='fw-bold'),
+            html.H5('Surplus Optimization on the Efficient Frontier',
+                    className='fw-bold'),
             html.P('The mean liability and risk-adjusted surplus curves are plotted against a typical efficient frontier. This allows you see, visually, where optimal surplus intersects with the efficient frontier--and therefore, identifies the optimal portfolio (i.e., optimal asset allocation).'),
             html.P('The mean liability discount rate is the rate (i.e., the expected value, E(x)) at which future spending equals the current value of net assets. In other words, it is the return that would need to be generated in order to satisfy future liabilities (spending goals).'),
             html.P(
@@ -530,7 +532,7 @@ content = html.Div(id="page-content", style=CONTENT_STYLE)
 app.layout = html.Div([dcc.Location(id="url"), sidebar, content])
 
 
-@ app.callback(Output("page-content", "children"), [Input("url", "pathname")])
+@app.callback(Output("page-content", "children"), [Input("url", "pathname")])
 def render_page_content(pathname):
     if pathname == "/":
         return page_surplus
@@ -549,7 +551,7 @@ def render_page_content(pathname):
     )
 
 
-@ app.callback([
+@app.callback([
     Output('graph-content', 'figure'),
     Output('graph-content2', 'figure')],
     [Input('dropdown-selection', 'value'),

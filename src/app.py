@@ -61,8 +61,44 @@ df_lirr['Cash Outflow Yr 3'] = cf_3
 df_lirr['Cash Outflow Yr 4'] = cf_4
 df_lirr['Wealth Bequest Yr 5'] = cf_5
 
-dash_liab_table = dt.DataTable(df_lirr.to_dict(
-    'records'), [{"name": i, "id": i} for i in df_lirr.columns])
+# shared DataTable styling so tables blend into the surrounding Bootstrap
+# typography instead of using dash_table's default monospace grid look
+TABLE_STYLE_TABLE = {
+    'overflowX': 'auto',
+    'width': '100%',
+}
+# narrower tables don't need horizontal scroll
+TABLE_STYLE_TABLE_NO_SCROLL = {
+    'width': '100%',
+}
+TABLE_STYLE_CELL = {
+    'fontFamily': 'inherit',
+    'fontSize': '0.9rem',
+    'textAlign': 'center',
+    'padding': '8px 12px',
+    'border': 'none',
+    'borderBottom': '1px solid #E9ECEF',
+}
+TABLE_STYLE_HEADER = {
+    'backgroundColor': 'transparent',
+    'borderBottom': '2px solid #2C3E50',
+    'fontFamily': 'inherit',
+    'fontSize': '0.9rem',
+    'fontWeight': 'bold',
+    'textAlign': 'center',
+}
+
+dash_liab_table = dt.DataTable(
+    df_lirr.to_dict('records'),
+    [{"name": i, "id": i} for i in df_lirr.columns],
+    id='dash-liab-table',
+    style_table=TABLE_STYLE_TABLE,
+    style_cell=TABLE_STYLE_CELL,
+    style_header=TABLE_STYLE_HEADER,
+    style_cell_conditional=[
+        {'if': {'column_id': ''}, 'textAlign': 'left', 'fontWeight': 'bold'},
+    ],
+)
 
 
 t_l_irr = ['5']
@@ -71,8 +107,13 @@ df_lirr_output = pd.DataFrame(
     data=t_l_irr, columns=['Liability Discount Rate (%)'])
 df_lirr_output['Liability Standard Deviation (σ)'] = t_l_stddev
 
-dash_lirr_table = dt.DataTable(df_lirr_output.to_dict(
-    'records'), [{"name": i, "id": i} for i in df_lirr_output.columns])
+dash_lirr_table = dt.DataTable(
+    df_lirr_output.to_dict('records'),
+    [{"name": i, "id": i} for i in df_lirr_output.columns],
+    style_table=TABLE_STYLE_TABLE_NO_SCROLL,
+    style_cell=TABLE_STYLE_CELL,
+    style_header=TABLE_STYLE_HEADER,
+)
 
 
 ############## FUNCTION INPUTS ##################
@@ -386,23 +427,15 @@ page_liability = html.Div([
            style={'textAlign': 'left', 'color': 'grey', 'paddingLeft': '15px'}),
     html.Hr(className='mt-2 mb-4'),
     paper_attribution,
-    dbc.Row([dash_liab_table], className='mb-4'),
+    dbc.Row([
+        dbc.Col([dash_liab_table], width=12),
+    ], className='mb-4'),
     dbc.Row([
         dbc.Col([dash_lirr_table], width=6),
         dbc.Col([
             html.I(children='<-- These become the inputs that flow through to the first tab', className='text-muted', style={
                 'textAlign': 'left'})])
     ], className='mb-4'),
-    dbc.Row([
-        dbc.Col([
-            dcc.Graph(figure=surf_fig),
-            html.P('Notes: n=2,000; probability distribution of present value discount rate of liabilities based on annual cashflows and residual value above.', className='text-muted small'),
-        ], width=6),
-        dbc.Col([
-            drawText2('Tracing the Liability Probability Densities using Monte Carlo', 'The implied discount rate of the stated values above has a mean of ~.05 and a standard deviation of ~.06. These values were chosen for simplicity to illustrate that expected increases of .05 every year will clearly lead to an average expected return starting today of .05. The individual yearly standard deviations of .25 result in a combined standard deviation (relative to starting wealth) of .06 as stated. Correlation between assets and liabilities is set to 1.0 to reflect that an investor will increase or decrease future spending outlays based on actual asset returns. The probability distribution of the liability is traced out using Monte Carlo. The surface to the left reflects the fact that this distribution is constant across the efficient frontier. So while asset volatility fluctuates, liability volatility is constant across the range of the efficient frontier.',
-                      '')
-        ], width=6),
-    ], align='center', className='mb-4'),
     dbc.Row([
         dbc.Col([
             dcc.Graph(figure=fig_efpx)
@@ -417,7 +450,17 @@ page_liability = html.Div([
                     className='fw-bold'),
             html.P('The duration of liabilities is matched to the duration of the assets. In this case, we are using an equivalent total of 5 years for each. This has an important impact on the efficient frontier given an increased time horizon has the effect of increasing the probability of a positive outcome over the total period. This can be observed, visually, by the amount of observations that land above the point of zero returns as the time horizon increases (i.e., in the graph on the right). This is also an area where the model complexity could be increased in order to more realistically match time horizon effects. For example, a weighting of the dollar duration of liabilities might be more precise or even more interestingly, multi-period optimizations, such as dynamic programming. However, this paper focuses on the methodology of combining asset and liability returns rather than fine tuning the liability calculations. In addition, there has been substantial research in the fields of dynamic programming that could likely be applied to extend this model.'),
         ], width=12),
-    ]),
+    ], className='mb-4'),
+    dbc.Row([
+        dbc.Col([
+            dcc.Graph(figure=surf_fig),
+            html.P('Notes: n=2,000; probability distribution of present value discount rate of liabilities based on annual cashflows and residual value above.', className='text-muted small'),
+        ], width=6),
+        dbc.Col([
+            drawText2('Tracing the Liability Probability Densities using Monte Carlo', 'The implied discount rate of the stated values above has a mean of ~.05 and a standard deviation of ~.06. These values were chosen for simplicity to illustrate that expected increases of .05 every year will clearly lead to an average expected return starting today of .05. The individual yearly standard deviations of .25 result in a combined standard deviation (relative to starting wealth) of .06 as stated. Correlation between assets and liabilities is set to 1.0 to reflect that an investor will increase or decrease future spending outlays based on actual asset returns. The probability distribution of the liability is traced out using Monte Carlo. The surface to the left reflects the fact that this distribution is constant across the efficient frontier. So while asset volatility fluctuates, liability volatility is constant across the range of the efficient frontier.',
+                      '')
+        ], width=6),
+    ], align='center'),
 ])
 
 page_surplus = html.Div([
@@ -431,13 +474,13 @@ page_surplus = html.Div([
         dbc.Col([
             html.P('Discount Rate at which Future Spending Liabilities = PV of Current Net Assets (%)',
                    className='small text-muted mb-1', style={'textAlign': 'left'}),
-            dcc.Dropdown([float(5.0), float(6.0), float(7.0)], float(5.0),
+            dcc.Dropdown([float(x) for x in [2, 3, 4, 5, 6, 7]], float(5.0),
                          id='dropdown-selection')], width=4),
 
         dbc.Col([
             html.P('Spending Flexibility of Liabilities (σ) using Goal Ranges & Monte Carlo (next page)',
                    className='small text-muted mb-1', style={'textAlign': 'left'}),
-            dcc.Dropdown([float(5.0), float(6.0), float(10.0)], float(6.0),
+            dcc.Dropdown([float(x) for x in [5, 6, 8, 10, 15, 20]], float(6.0),
                          id='dropdown-selection2')], width=4),
     ], align='left', className='mb-4'),
     dbc.Row([

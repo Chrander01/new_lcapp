@@ -1,0 +1,18 @@
+/* Thinner, more subtle horizontal scrollbar on the liability cash flow table */
+#dash-liab-table .dash-spreadsheet-container {
+    scrollbar-width: thin;
+    scrollbar-color: #C1C9D2 transparent;
+}
+
+#dash-liab-table .dash-spreadsheet-container::-webkit-scrollbar {
+    height: 6px;
+}
+
+#dash-liab-table .dash-spreadsheet-container::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+#dash-liab-table .dash-spreadsheet-container::-webkit-scrollbar-thumb {
+    background-color: #C1C9D2;
+    border-radius: 4px;
+}

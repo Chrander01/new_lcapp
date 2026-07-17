@@ -22,9 +22,22 @@ def _fetch_csv(name):
 
 
 temp = _fetch_csv('temp.csv')                     # Monte Carlo simulated portfolios
+# Drop the CSV's saved row index and the raw portfolio weight vectors;
+# the Monte Carlo scatter only plots returns, vols, and Sharpe ratios
+temp = temp.drop(columns=['Unnamed: 0', 'weights'])
 efport = _fetch_csv('efport.csv')                 # efficient frontier points
+# Drop the CSV's saved row index and the pre-baked surplus columns for
+# fixed discount rates; all unused — the app computes arithmetic surplus
+# dynamically from the user's input
+efport = efport.drop(columns=['Unnamed: 0',
+                              'arithmetic surplus',
+                              'arithmetic surplus 2',
+                              'arithmetic surplus 3'])
 df_combined = _fetch_csv('df_combined.csv')       # 1-year EF return simulations
 df_combined_10 = _fetch_csv('df_combined_10.csv')  # 5-year EF return simulations
+# Drop the CSVs' saved row indexes; unused
+df_combined = df_combined.drop(columns=['Unnamed: 0'])
+df_combined_10 = df_combined_10.drop(columns=['Unnamed: 0'])
 bins_df = _fetch_csv('bins_df.csv')               # liability PDF traced across the EF
 
 df_combined['r'] = df_combined['r']/100

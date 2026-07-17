@@ -129,7 +129,8 @@ for i in range(0, 11):
 
 def update_mean(input_value, input_std):
     mean_irr_df = input_value  # MEAN LIABILITY IRR; expects percent; no need for decimal
-    sd_irr_df = input_std  # expects percent; no need for decimal
+    # expects percent; no need for decimal (standard deviation)
+    sd_irr_df = input_std
     time_horizon = 5.0
     mean_irr_full_horizon = (1+mean_irr_df/100)**time_horizon-1
     sd_irr_time_horizon = sd_irr_df/100*np.sqrt(time_horizon)
@@ -153,7 +154,7 @@ def update_mean(input_value, input_std):
     for i in range(0, 10):    # Times 100 here changes the presentation to be in percent
         surplus_mean_1.append(((1+surplus_mean[i])**(1/time_horizon)-1)*100)
 
-    # Table output of the previous calculations
+    # SURPLUS CURVE Table output of the previous calculations
 
     mean_surplus_curve = pd.DataFrame(surplus_mean_1, columns=['targetrets'])
 
@@ -373,6 +374,94 @@ def drawText2(title_inp, text_inp, text2_inp):
     return html.Div(children, className='mb-3')
 
 
+def update_graph(value, s_value):
+    """Rebuild the two Outputs-page figures for the selected liability
+    discount rate (value, %) and spending flexibility (s_value, sigma %)."""
+    mean_surplus_z = update_mean(value, s_value)
+
+    # --- Curves to plot, in color order: efficient frontier (blue),
+    # mean liability (orange), risk-adjusted surplus (forestgreen),
+    # optimized-vol marker line (lightslategrey), arithmetic surplus (limegreen)
+    l_curve = pd.DataFrame({'targetvols': efport['targetvols'],
+                            'targetrets': float(value),
+                            'type': 'mean liability'})
+    combined_df = pd.concat(
+        [efport.loc[0:18], l_curve.loc[0:18]], ignore_index=True, sort=False)
+
+    s_curve = pd.DataFrame({'targetrets': mean_surplus_z['Risk Adjusted Surplus'],
+                            'targetvols': mean_surplus_z['targetvols'],
+                            'type': 'risk adjusted surplus'})
+
+    # Optimal portfolio = the efficient-frontier point whose volatility
+    # maximizes risk-adjusted surplus
+    best = mean_surplus_z.loc[mean_surplus_z['Risk Adjusted Surplus'].idxmax()]
+    optimized_surplus = float(best['Risk Adjusted Surplus'])
+    optimized_vol = float(best['targetvols'])
+    optimized_ret = float(
+        efport.loc[efport['targetvols'] == optimized_vol, 'targetrets'].iloc[0])
+
+    # Vertical segment connecting the optimized surplus to the EF portfolio
+    o_line = pd.DataFrame({'targetrets': [optimized_surplus, optimized_ret],
+                           'targetvols': optimized_vol,
+                           'type': 'optimized volatility (nearest discrete portfolio)'})
+
+    ml_line = pd.DataFrame({'targetrets': efport['targetrets'].loc[0:18] - value,
+                            'targetvols': efport['targetvols'].loc[0:18],
+                            'type': 'arithmetic mean surplus'})
+
+    dff_graph = pd.concat([combined_df, s_curve, o_line, ml_line])
+
+    # --- Main surplus-optimization figure
+    figure = px.line(
+        dff_graph, y='targetrets', x='targetvols', color='type',
+        title='Optimizing Risk-Adjusted Surplus vs. Efficient Frontier',
+        color_discrete_sequence=["blue", "orange", "forestgreen",
+                                 "lightslategrey", "limegreen"])
+
+    figure.add_scatter(
+        mode='markers', x=[optimized_vol], y=[optimized_ret],
+        marker=dict(color='blue', size=8, symbol='diamond'),
+        name='Optimized EF Portfolio').update(layout_showlegend=False)
+    figure.add_scatter(
+        mode='markers', x=[optimized_vol], y=[optimized_surplus],
+        marker=dict(color='forestgreen', size=8, symbol='diamond'),
+        name='Optimized Risk-Adjusted Surplus (nearest discrete portfolio)'
+    ).update(layout_showlegend=False)
+
+    ef_text = "Efficient Frontier* (µ="+str(optimized_ret) + \
+        "%, σ="+str(optimized_vol)+"%)"
+    annotations = [
+        dict(y=optimized_ret, text=ef_text,
+             yanchor='bottom', yshift=10, font=dict(size=11, color='blue')),
+        dict(y=optimized_surplus, text='<b>Optimized Risk-Adjusted Surplus</b>',
+             yanchor='middle', xanchor='left', xshift=20, yshift=-3,
+             font=dict(size=11, color='forestgreen')),
+        dict(y=value, text='Mean Liability Discount Rate',
+             yanchor='bottom', xanchor='left', xshift=50,
+             font=dict(size=10, color='orange')),
+        dict(y=optimized_ret-value, text='Arithmetic Mean Surplus',
+             yanchor='bottom', xanchor='left', xshift=3, yshift=13,
+             font=dict(size=10, color='limegreen')),
+    ]
+    for ann in annotations:
+        figure.add_annotation(x=optimized_vol, showarrow=False,
+                              arrowhead=1, **ann)
+    figure.update_layout(legend=dict(
+        yanchor="bottom", y=0.01, xanchor="left", x=0.15))
+
+    # --- Implied utility figure
+    utility_df = pd.DataFrame(
+        mean_surplus_z['Arithmetic Mean Surplus'].loc[0:6])
+    utility_df['Risk Adjusted Surplus'] = mean_surplus_z['Risk Adjusted Surplus'].loc[0:6]
+    data = px.line(utility_df, x='Arithmetic Mean Surplus', y='Risk Adjusted Surplus',
+                   line_shape='spline', title='Implied Investor Utility Function')
+    data.update_traces(showlegend=True, name='Implied Utility Function')
+    data.update_layout(legend=dict(
+        yanchor="bottom", y=0.01, xanchor="right", x=0.99))
+
+    return figure, data
+
+
 p_title1 = "Extending Sharpe and Tint (1990) Surplus Optimization to GBI"
 p_title2 = "Research article at SSRN: https://papers.ssrn.com/sol3/papers.cfm?abstract_id=4357369"
 p_title3 = "© 2024-2026 VS Quantitative Solutions LLC, All Rights Reserved."
@@ -480,7 +569,7 @@ page_surplus = html.Div([
         dbc.Col([
             html.P('Spending Flexibility of Liabilities (σ) using Goal Ranges & Monte Carlo (next page)',
                    className='small text-muted mb-1', style={'textAlign': 'left'}),
-            dcc.Dropdown([float(x) for x in [5, 6, 8, 10, 15, 20]], float(6.0),
+            dcc.Dropdown([float(x) for x in [5.13, 7.19, 9.6, 12.14, 14.75, 20.08]], float(5.13),
                          id='dropdown-selection2')], width=4),
     ], align='left', className='mb-4'),
     dbc.Row([
@@ -594,161 +683,12 @@ def render_page_content(pathname):
     )
 
 
-@app.callback([
-    Output('graph-content', 'figure'),
-    Output('graph-content2', 'figure')],
+app.callback(
+    [Output('graph-content', 'figure'),
+     Output('graph-content2', 'figure')],
     [Input('dropdown-selection', 'value'),
      Input('dropdown-selection2', 'value')]
-)
-def update_graph(value, s_value):
-    mean_surplus_z = update_mean(value, s_value)
-    s_curve = pd.DataFrame(mean_surplus_z['Risk Adjusted Surplus'])
-    s_curve.rename(
-        columns={'Risk Adjusted Surplus': 'targetrets'}, inplace=True)
-    s_curve['targetvols'] = mean_surplus_z['targetvols']
-    s_curve['type'] = 'risk adjusted surplus'
-
-    s_combined = s_curve
-
-    l_curve = pd.DataFrame(efport['targetvols'])
-    l_curve['targetrets'] = float(value)
-    l_curve['type'] = 'mean liability'
-
-    ############################################# NEW ####################################################
-
-    combined_df = pd.concat(
-        [efport.loc[0:18], l_curve.loc[0:18]], ignore_index=True, sort=False)
-
-    ####################################### OPTIMIZED POINT ##############################################
-
-    optimized_surplus = max(mean_surplus_z['Risk Adjusted Surplus'])
-    row_index = mean_surplus_z.index.get_loc(
-        mean_surplus_z[mean_surplus_z['Risk Adjusted Surplus'] == optimized_surplus].index[0])
-    optimized_vol = mean_surplus_z['targetvols'].iloc[row_index]
-    optimized_surplus = float(optimized_surplus)
-    row_index2 = combined_df.index.get_loc(
-        combined_df[combined_df['targetvols'] == optimized_vol].index[0])
-    optimized_ret = combined_df['targetrets'].iloc[row_index2]
-    optimized_ret = float(optimized_ret)
-    optimized_vol = float(optimized_vol)
-
-    o_rets = [optimized_surplus, optimized_ret]
-    o_line = pd.DataFrame(o_rets, columns=['targetrets'])
-    o_line['targetvols'] = optimized_vol
-    o_line['type'] = 'optimized volatility (nearest discrete portfolio)'
-
-    ################################################ NEW #################################################
-
-    arith_surplus_values = []
-
-    for i in range(0, 11):
-        arith_surplus_values.append(assetport['arithmetic surplus'].iloc[i*2])
-
-    arith_surplus_vols = []
-
-    for i in range(0, 11):
-        arith_surplus_vols.append(assetport['targetvols'].iloc[i*2])
-
-    arith_surplus_df = pd.DataFrame(
-        arith_surplus_values, columns=['targetrets'])
-
-    arith_surplus_df['targetvols'] = arith_surplus_vols
-    arith_surplus_df['type'] = 'Arithmetic Mean Surplus'
-
-    arith_surplus_df = arith_surplus_df.loc[0:9]
-
-    utility_df = pd.DataFrame(
-        mean_surplus_z['Arithmetic Mean Surplus'].loc[0:6])
-    utility_df['Risk Adjusted Surplus'] = mean_surplus_z['Risk Adjusted Surplus'].loc[0:6]
-    data = px.line(utility_df, x='Arithmetic Mean Surplus', y='Risk Adjusted Surplus',
-                   line_shape='spline', title='Implied Investor Utility Function')
-    data['data'][0]['showlegend'] = True
-    data['data'][0]['name'] = 'Implied Utility Function'
-    data.update_layout(legend=dict(
-        yanchor="bottom", y=0.01, xanchor="right", x=0.99))
-    dff = combined_df
-    dff2 = s_combined
-    dff_graph = pd.concat([dff, dff2])
-    dff3 = o_line
-    dff_graph = pd.concat([dff_graph, o_line])
-    ml_line = pd.DataFrame(efport['targetrets'].loc[0:18] - value)
-    ml_line['targetvols'] = efport['targetvols']
-    ml_line['type'] = 'arithmetic mean surplus'
-    dff_graph = pd.concat([dff_graph, ml_line])
-
-    ef_text = "Efficient Frontier* (µ="+str(optimized_ret) + \
-        "%, σ="+str(optimized_vol)+"%)"
-
-    figure = px.line(dff_graph, y='targetrets',
-                     x='targetvols', color='type', title='Optimizing Risk-Adjusted Surplus vs. Efficient Frontier', color_discrete_sequence=["blue", "orange", "forestgreen", "lightslategrey", "limegreen"])
-
-    # Plot max sharpe
-    figure.add_scatter(
-        mode='markers',
-        x=[optimized_vol],
-        y=[optimized_ret],
-        marker=dict(color='blue', size=8, symbol='diamond'),
-        name='Optimized EF Portfolio').update(layout_showlegend=False)
-    figure.add_scatter(
-        mode='markers',
-        x=[optimized_vol],
-        y=[optimized_surplus],
-        marker=dict(color='forestgreen', size=8, symbol='diamond'),
-        name='Optimized Risk-Adjusted Surplus (nearest discrete portfolio)').update(layout_showlegend=False)
-
-    figure.add_annotation(x=optimized_vol, y=optimized_ret,
-                          text=ef_text,
-                          yanchor='bottom',
-                          # xanchor='left',
-                          yshift=10,
-                          showarrow=False,
-                          arrowhead=1,
-                          font=dict(
-                              # family="Courier New, monospace",
-                              size=11,
-                              color="blue"
-                          ),)
-    figure.add_annotation(x=optimized_vol, y=optimized_surplus,
-                          text="<b>Optimized Risk-Adjusted Surplus</b>",
-                          yanchor='middle',
-                          xanchor='left',
-                          xshift=20,
-                          yshift=-3,
-                          showarrow=False,
-                          arrowhead=1,
-                          font=dict(
-                              # family="Courier New, monospace",
-                              size=11,
-                              color="forestgreen"
-                          ),)
-    figure.add_annotation(x=optimized_vol, y=value,
-                          text="Mean Liability Discount Rate",
-                          yanchor='bottom',
-                          xanchor='left',
-                          xshift=50,
-                          showarrow=False,
-                          arrowhead=1,
-                          font=dict(
-                              # family="Courier New, monospace",
-                              size=10,
-                              color="orange"
-                          ),)
-    figure.add_annotation(x=optimized_vol, y=optimized_ret-value,
-                          text="Arithmetic Mean Surplus",
-                          yanchor='bottom',
-                          xanchor='left',
-                          xshift=3,
-                          yshift=13,
-                          showarrow=False,
-                          arrowhead=1,
-                          font=dict(
-                              # family="Courier New, monospace",
-                              size=10,
-                              color="limegreen"
-                          ),)
-    figure.update_layout(legend=dict(
-        yanchor="bottom", y=0.01, xanchor="left", x=0.15))
-    return figure, data
+)(update_graph)
 
 
 if __name__ == "__main__":

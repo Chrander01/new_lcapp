@@ -4,15 +4,15 @@ All data loading and surplus calculations live in analysis.py; this
 module only builds what the user sees.
 """
 
-from dash import Dash, html, dcc, Output, Input
+from dash import Dash, html, dcc, Output, Input, no_update
 from dash import dash_table as dt
 import dash_bootstrap_components as dbc
 import plotly.express as px
 import plotly.graph_objects as go
 
 from analysis import (bins_df, bin_yaxis_values, df_combined, df_combined_10,
-                      df_lirr, df_lirr_output, efport, temp, update_graph,
-                      vol_list)
+                      df_lirr, efport, temp, update_graph, vol_list)
+from liability import IRR_MEAN_COL, IRR_STD_COL, irr_output_records, table_irr
 import content as txt
 
 app = Dash(__name__, external_stylesheets=[
@@ -101,10 +101,22 @@ TABLE_STYLE_HEADER = {
     'textAlign': 'center',
 }
 
+# Monte Carlo IRR of the default schedule; these seed the liability
+# store (and so the Outputs page) until the user edits the Step 1 table
+DEFAULT_LIAB_IRR, DEFAULT_LIAB_SIGMA = table_irr(df_lirr.to_dict('records'))
+
+# Editable: the user can overwrite any cash flow or standard deviation
+# (the row-label column stays fixed); the Monte Carlo IRR table below
+# recalculates from whatever is entered. Memory persistence keeps edits
+# across page navigation but resets them on reload, matching the store.
 dash_liab_table = dt.DataTable(
     df_lirr.to_dict('records'),
-    [{"name": i, "id": i} for i in df_lirr.columns],
+    [{"name": i, "id": i, "editable": i != ''} for i in df_lirr.columns],
     id='dash-liab-table',
+    editable=True,
+    persistence=True,
+    persisted_props=['data'],
+    persistence_type='memory',
     style_table=TABLE_STYLE_TABLE,
     style_cell=TABLE_STYLE_CELL,
     style_header=TABLE_STYLE_HEADER,
@@ -113,9 +125,12 @@ dash_liab_table = dt.DataTable(
     ],
 )
 
+# The discount rate / sigma implied by the schedule above, via Monte
+# Carlo IRR; refreshed by the update_liability_irr callback on every edit
 dash_lirr_table = dt.DataTable(
-    df_lirr_output.to_dict('records'),
-    [{"name": i, "id": i} for i in df_lirr_output.columns],
+    irr_output_records(DEFAULT_LIAB_IRR, DEFAULT_LIAB_SIGMA),
+    [{"name": i, "id": i} for i in (IRR_MEAN_COL, IRR_STD_COL)],
+    id='dash-lirr-table',
     style_table=TABLE_STYLE_TABLE_NO_SCROLL,
     style_cell=TABLE_STYLE_CELL,
     style_header=TABLE_STYLE_HEADER,
@@ -209,7 +224,8 @@ page_liability = html.Div([
             html.P(txt.liability_surface_notes, className='text-muted small'),
         ], width=6),
         dbc.Col([
-            drawText2(txt.liability_tracing_title, txt.liability_tracing_body, '')
+            drawText2(txt.liability_tracing_title,
+                      txt.liability_tracing_body, '')
         ], width=6),
     ], align='center'),
 ])
@@ -223,16 +239,10 @@ page_surplus = html.Div([
     paper_attribution,
     dbc.Row([
         dbc.Col([
-            html.P(txt.outputs_dropdown1_label,
+            html.P(txt.outputs_inputs_label,
                    className='small text-muted mb-1', style={'textAlign': 'left'}),
-            dcc.Dropdown([float(x) for x in [2, 3, 4, 5, 6, 7]], float(3.0),
-                         id='dropdown-selection')], width=4),
-
-        dbc.Col([
-            html.P(txt.outputs_dropdown2_label,
-                   className='small text-muted mb-1', style={'textAlign': 'left'}),
-            dcc.Dropdown([float(x) for x in [5.13, 7.19, 9.6, 12.14, 14.75, 20.08]], float(5.13),
-                         id='dropdown-selection2')], width=4),
+            html.Div(id='outputs-liability-display', className='fw-bold'),
+        ], width=8),
     ], align='left', className='mb-4'),
     dbc.Row([
         dbc.Col([
@@ -318,7 +328,17 @@ sidebar = html.Div(
 
 content = html.Div(id="page-content", style=CONTENT_STYLE)
 
-app.layout = html.Div([dcc.Location(id="url"), sidebar, content])
+# The liability store is the single driving variable of the model: the
+# Step 1 table writes the simulated IRR mean/sigma here, and the Outputs
+# page reads it to build the surplus figures. It lives in the root
+# layout so it survives page navigation.
+app.layout = html.Div([
+    dcc.Location(id="url"),
+    dcc.Store(id='liability-store',
+              data={'irr': DEFAULT_LIAB_IRR, 'sigma': DEFAULT_LIAB_SIGMA}),
+    sidebar,
+    content,
+])
 
 ################## CALLBACKS ###################
 
@@ -342,12 +362,37 @@ def render_page_content(pathname):
     )
 
 
-app.callback(
-    [Output('graph-content', 'figure'),
-     Output('graph-content2', 'figure')],
-    [Input('dropdown-selection', 'value'),
-     Input('dropdown-selection2', 'value')]
-)(update_graph)
+@app.callback([Output('dash-lirr-table', 'data'),
+               Output('liability-store', 'data')],
+              Input('dash-liab-table', 'data'))
+def update_liability_irr(rows):
+    """Re-run the Monte Carlo IRR whenever a liability cell is edited,
+    updating both the Step 1 output table and the app-wide store.
+
+    Half-typed values (e.g. '-$' or '2%x') won't parse; keep showing the
+    last good result until the cell is a valid number again.
+    """
+    try:
+        mean_irr, std_irr = table_irr(rows)
+    except (ValueError, TypeError, IndexError, KeyError):
+        return no_update, no_update
+    return (irr_output_records(mean_irr, std_irr),
+            {'irr': mean_irr, 'sigma': std_irr})
+
+
+@app.callback([Output('graph-content', 'figure'),
+               Output('graph-content2', 'figure')],
+              Input('liability-store', 'data'))
+def update_surplus_graphs(liability):
+    """Drive the Outputs-page figures from the simulated liability IRR."""
+    return update_graph(liability['irr'], liability['sigma'])
+
+
+@app.callback(Output('outputs-liability-display', 'children'),
+              Input('liability-store', 'data'))
+def show_liability_inputs(liability):
+    return (f"Liability Discount Rate (Mean IRR): {liability['irr']:.2f}%"
+            f"  |  Spending Flexibility (σ): {liability['sigma']:.2f}%")
 
 
 if __name__ == "__main__":

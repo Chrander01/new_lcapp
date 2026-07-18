@@ -64,7 +64,9 @@ bin_yaxis_values = [-0.11405089, -0.0967508, -0.0794507, -0.06215061, -0.0448505
 ############ LIABILITY ASSUMPTIONS ###############
 
 # Cash flow schedule and per-year spending flexibility (Step 1 page table);
-# rows are Cash Flow and Standard Deviation
+# rows are Cash Flow and Standard Deviation. These are the defaults for
+# the editable Step 1 table; liability.py Monte Carlos the IRR of
+# whatever the user enters there.
 df_lirr = pd.DataFrame({
     '': ['Cash Flow', 'Standard Deviation'],
     'Starting Wealth': ['$1,000,000', '0%'],
@@ -73,12 +75,6 @@ df_lirr = pd.DataFrame({
     'Cash Outflow Yr 3': ['-$50,000', '25%'],
     'Cash Outflow Yr 4': ['-$50,000', '25%'],
     'Wealth Bequest Yr 5': ['-$1,050,000', '25%'],
-})
-
-# The discount rate / sigma implied by the schedule above
-df_lirr_output = pd.DataFrame({
-    'Liability Discount Rate (%)': ['3'],
-    'Liability Standard Deviation (σ)': ['6'],
 })
 
 ############## SURPLUS CALCULATION ###############

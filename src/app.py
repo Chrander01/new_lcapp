@@ -4,8 +4,11 @@ All data loading and surplus calculations live in analysis.py; this
 module only builds what the user sees.
 """
 
+import os
+
 from dash import Dash, html, dcc, Output, Input, State, ctx, no_update
 from dash import dash_table as dt
+import dash_auth
 import dash_bootstrap_components as dbc
 import plotly.express as px
 import plotly.graph_objects as go
@@ -18,6 +21,14 @@ import content as txt
 
 app = Dash(__name__, external_stylesheets=[
            dbc.themes.FLATLY], title="Surplus App")
+
+# Browser Basic Auth to keep casual visitors out — not hardened security.
+# Credentials come from Heroku config vars (LCAPP_USERNAME/LCAPP_PASSWORD)
+# so they stay out of the repo; with them unset (e.g. local dev) the app
+# runs without a login prompt.
+if os.environ.get('LCAPP_USERNAME') and os.environ.get('LCAPP_PASSWORD'):
+    dash_auth.BasicAuth(
+        app, {os.environ['LCAPP_USERNAME']: os.environ['LCAPP_PASSWORD']})
 
 # Declare server for Heroku deployment. Needed for Procfile.
 server = app.server

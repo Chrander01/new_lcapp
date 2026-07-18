@@ -102,22 +102,36 @@ def update_mean(input_value, input_std):
     surplus_mean = ef_rets_full_horizon - float(mean_irr_full_horizon)
     annualized_surplus = ((1+surplus_mean)**(1/time_horizon)-1)*100
 
-    # Std dev of surplus: combines asset and liability vol at correlation 1.0
+    # The standard two-asset variance formula σₐ² + σᵦ² − 2ρσₐσᵦ with ρ = 1
+    # algebraically collapses to just !!|ef_vols − input_std|!!
     surplus_stddev = np.sqrt(
         (ef_vols/100)**2 + (input_std/100)**2 - 2*1*ef_vols/100*input_std/100)
 
-    out = pd.DataFrame({'targetrets': annualized_surplus})
-    out['Surplus Std Dev'] = surplus_stddev
-    out['Mean Surplus'] = out['targetrets']/100
-    out['targetvols'] = ef_vols
-    out['BE Surplus_95%'] = z*out['Surplus Std Dev']
-    out['Risk Premium'] = out['BE Surplus_95%'] - out['Mean Surplus']
-    out['BE Output'] = out['BE Surplus_95%']*100
-    out['Risk Premium Output'] = out['Risk Premium']*100
-    out['Risk Adjusted Surplus'] = (
-        out['Mean Surplus']*100 - out['Risk Premium']*100)
-    out['Mean Surplus Output'] = out['Mean Surplus']*100
+    out = pd.DataFrame({'targetvols': ef_vols})
+    out['ef_returns'] = ef_rets
     out['Arithmetic Mean Surplus'] = ef_rets - float(input_value)
+    out['Mean Surplus (Long-term compounded EF - compounded Liab Discount Rate)'] = annualized_surplus/100
+    out['Surplus Std Dev = Corr(ef_vols,liability_std) = |ef_vols - liability_std|'] = surplus_stddev
+    # You can see that in your table: the column bottoms out at ~0.0009 in
+    # row 7, where the portfolio vol (6.09%) nearly equals your sigma input
+    # (6%), and grows as vol moves away from 6% in either direction. So
+    # BE Surplus_95% is 1.65 standard deviations of surplus risk — the buffer
+    # the portfolio must clear at 95% confidence — and it's why the
+    # risk-adjusted optimum lands near the frontier point whose volatility
+    # matches the liability's.
+    out['BE Surplus_95% (Surplus Std Dev x z-score)'] = z*out['Surplus Std Dev = Corr(ef_vols,liability_std) = |ef_vols - liability_std|']
+    out['Risk Premium (BE Surplus_95% - Mean Surplus)'] = (
+        out['BE Surplus_95% (Surplus Std Dev x z-score)'] - out['Mean Surplus (Long-term compounded EF - compounded Liab Discount Rate)'])
+    out['Risk Adjusted Surplus (Mean Surplus - Risk Premium)'] = (
+        out['Mean Surplus (Long-term compounded EF - compounded Liab Discount Rate)']
+        - out['Risk Premium (BE Surplus_95% - Mean Surplus)'])
+    out['Output BE (95% BE x 100)'] = out['BE Surplus_95% (Surplus Std Dev x z-score)']*100
+    out['Output Mean Surplus (x 100)'] = out['Mean Surplus (Long-term compounded EF - compounded Liab Discount Rate)']*100
+    out['Output Risk Premium (x 100)'] = (
+        out['Risk Premium (BE Surplus_95% - Mean Surplus)']*100)
+    out['Output Risk Adjusted Surplus (x 100)'] = (
+        out['Mean Surplus (Long-term compounded EF - compounded Liab Discount Rate)']*100
+        - out['Risk Premium (BE Surplus_95% - Mean Surplus)']*100)
 
     return out
 
@@ -136,14 +150,14 @@ def update_graph(value, s_value):
     combined_df = pd.concat(
         [efport, l_curve], ignore_index=True, sort=False)
 
-    s_curve = pd.DataFrame({'targetrets': mean_surplus_z['Risk Adjusted Surplus'],
+    s_curve = pd.DataFrame({'targetrets': mean_surplus_z['Output Risk Adjusted Surplus (x 100)'],
                             'targetvols': mean_surplus_z['targetvols'],
                             'type': 'risk adjusted surplus'})
 
     # Optimal portfolio = the efficient-frontier point whose volatility
     # maximizes risk-adjusted surplus
-    best = mean_surplus_z.loc[mean_surplus_z['Risk Adjusted Surplus'].idxmax()]
-    optimized_surplus = float(best['Risk Adjusted Surplus'])
+    best = mean_surplus_z.loc[mean_surplus_z['Output Risk Adjusted Surplus (x 100)'].idxmax()]
+    optimized_surplus = float(best['Output Risk Adjusted Surplus (x 100)'])
     optimized_vol = float(best['targetvols'])
     optimized_ret = float(
         efport.loc[efport['targetvols'] == optimized_vol, 'targetrets'].iloc[0])
@@ -200,8 +214,8 @@ def update_graph(value, s_value):
     # --- Implied utility figure (lower half of the frontier, through ~12% vol)
     utility_df = pd.DataFrame(
         mean_surplus_z['Arithmetic Mean Surplus'].loc[0:12])
-    utility_df['Risk Adjusted Surplus'] = mean_surplus_z['Risk Adjusted Surplus'].loc[0:12]
-    data = px.line(utility_df, x='Arithmetic Mean Surplus', y='Risk Adjusted Surplus',
+    utility_df['Output Risk Adjusted Surplus (x 100)'] = mean_surplus_z['Output Risk Adjusted Surplus (x 100)'].loc[0:12]
+    data = px.line(utility_df, x='Arithmetic Mean Surplus', y='Output Risk Adjusted Surplus (x 100)',
                    line_shape='spline', title='Implied Investor Utility Function')
     data.update_traces(showlegend=True, name='Implied Utility Function')
     data.update_layout(legend=dict(

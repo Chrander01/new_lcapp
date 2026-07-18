@@ -12,7 +12,8 @@ import plotly.graph_objects as go
 
 from analysis import (bins_df, bin_yaxis_values, df_combined, df_combined_10,
                       df_lirr, efport, temp, update_graph, vol_list)
-from liability import IRR_MEAN_COL, IRR_STD_COL, irr_output_records, table_irr
+from liability import (IRR_MEAN_COL, IRR_STD_COL, format_table_records,
+                       irr_output_records, table_irr)
 import content as txt
 
 app = Dash(__name__, external_stylesheets=[
@@ -214,8 +215,7 @@ page_liability = html.Div([
                        color='primary', size='sm',
                        className='mt-2 me-2'),
             dbc.Button(txt.liability_reset_label, id='reset-liab-button',
-                       color='secondary', outline=True, size='sm',
-                       className='mt-2'),
+                       color='primary', size='sm', className='mt-2'),
         ], width=12),
     ], className='mb-4'),
     dbc.Row([
@@ -395,6 +395,20 @@ def load_liability_table(rows):
     return rows
 
 
+@app.callback(Output('dash-liab-table', 'data', allow_duplicate=True),
+              Input('dash-liab-table', 'data'),
+              prevent_initial_call=True)
+def format_liability_table(rows):
+    """Snap each accepted edit to the default currency/percent style
+    (e.g. '60000' -> '$60,000', '30' -> '30%'). Unparseable cells are
+    left as typed, and returning no_update when nothing changed stops
+    this self-referencing callback from cycling."""
+    formatted = format_table_records(rows)
+    if formatted == rows:
+        return no_update
+    return formatted
+
+
 @app.callback([Output('liability-inputs-store', 'data'),
                Output('dash-lirr-table', 'data'),
                Output('liability-store', 'data')],
@@ -417,7 +431,9 @@ def commit_liability_inputs(_calc, _reset, rows):
         mean_irr, std_irr = table_irr(rows)
     except (ValueError, TypeError, IndexError, KeyError):
         return no_update, no_update, no_update
-    return (rows, irr_output_records(mean_irr, std_irr),
+    # Store the normalized style even if the user hits Calculate before
+    # the format_liability_table round-trip lands
+    return (format_table_records(rows), irr_output_records(mean_irr, std_irr),
             {'irr': mean_irr, 'sigma': std_irr})
 
 

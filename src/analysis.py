@@ -43,6 +43,11 @@ df_combined_10 = _fetch_csv('df_combined_10.csv')
 # Drop the CSVs' saved row indexes; unused
 df_combined = df_combined.drop(columns=['Unnamed: 0'])
 df_combined_10 = df_combined_10.drop(columns=['Unnamed: 0'])
+# Keep every other simulated point (20,000 -> 10,000 per figure): the
+# rows are ordered by year, so this thins each year's column evenly and
+# roughly halves the Step 1 page's render payload
+df_combined = df_combined.iloc[::2].reset_index(drop=True)
+df_combined_10 = df_combined_10.iloc[::2].reset_index(drop=True)
 # liability PDF traced across the EF
 bins_df = _fetch_csv('bins_df.csv')
 
@@ -219,37 +224,45 @@ def update_graph(value, s_value):
         "%, σ="+str(optimized_vol)+"%)"
     # All labels except the Efficient Frontier's sit at the right end of
     # their curve (this figure's legend is hidden, so each curve is
-    # identified by an annotation instead)
+    # identified by an annotation instead). Several curves can end at
+    # nearly the same height, so after sorting the labels by y, any label
+    # closer than min_gap to the one below is pushed up; the matching
+    # colors keep each label attributable to its curve.
     right_edge = mean_surplus_z.iloc[-1]
     right_vol = float(right_edge['targetvols'])
     right_ret = float(efport['targetrets'].iloc[-1])
-    annotations = [
-        dict(x=optimized_vol, y=optimized_ret, text=ef_text,
-             yanchor='bottom', yshift=10, font=dict(size=11, color='blue')),
-        dict(x=right_vol,
-             y=float(right_edge['Output Risk Adjusted Surplus (x 100)']),
+    edge_labels = [
+        dict(y=float(right_edge['Output Risk Adjusted Surplus (x 100)']),
              text='<b>Optimized Risk-Adjusted Surplus</b>',
-             xanchor='right', yanchor='bottom', yshift=3,
              font=dict(size=11, color='forestgreen')),
-        dict(x=right_vol, y=value, text='Mean Liability Discount Rate',
-             xanchor='right', yanchor='bottom', yshift=3,
+        dict(y=float(value), text='Mean Liability Discount Rate',
              font=dict(size=10, color='orange')),
-        dict(x=right_vol, y=right_ret-value, text='Arithmetic Mean Surplus',
-             xanchor='right', yanchor='bottom', yshift=3,
+        dict(y=right_ret-value, text='Arithmetic Mean Surplus',
              font=dict(size=10, color='limegreen')),
-        dict(x=right_vol,
-             y=float(right_edge['Output Mean Surplus (x 100)']),
+        dict(y=float(right_edge['Output Mean Surplus (x 100)']),
              text='Mean Surplus over Time Horizon',
-             xanchor='right', yanchor='bottom', yshift=3,
              font=dict(size=10, color='crimson')),
-        dict(x=right_vol,
-             y=float(right_edge['Output Risk Premium (x 100)']),
+        dict(y=float(right_edge['Output Risk Premium (x 100)']),
              text='Risk Premium',
-             xanchor='right', yanchor='bottom', yshift=3,
              font=dict(size=10, color='teal')),
     ]
-    for ann in annotations:
-        figure.add_annotation(showarrow=False, arrowhead=1, **ann)
+    edge_labels.sort(key=lambda label: label['y'])
+    # ~a label's height in y-data units: all plotted series set the span
+    plotted_ys = pd.concat([
+        dff_graph['targetrets'],
+        mean_surplus_z['Output Mean Surplus (x 100)'],
+        mean_surplus_z['Output Risk Premium (x 100)'],
+    ])
+    min_gap = 0.05 * float(plotted_ys.max() - plotted_ys.min())
+    for below, label in zip(edge_labels, edge_labels[1:]):
+        label['y'] = max(label['y'], below['y'] + min_gap)
+
+    figure.add_annotation(showarrow=False, x=optimized_vol, y=optimized_ret,
+                          text=ef_text, yanchor='bottom', yshift=10,
+                          font=dict(size=11, color='blue'))
+    for label in edge_labels:
+        figure.add_annotation(showarrow=False, x=right_vol, xanchor='right',
+                              yanchor='bottom', yshift=3, **label)
     figure.update_layout(legend=dict(
         yanchor="bottom", y=0.01, xanchor="left", x=0.15))
 

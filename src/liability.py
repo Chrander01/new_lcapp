@@ -26,6 +26,35 @@ def parse_percent(text):
     return float(str(text).replace('%', '').strip()) / 100.0
 
 
+def format_currency(value):
+    """-50000.0 -> '-$50,000', matching the default schedule's style."""
+    sign = '-' if value < 0 else ''
+    return f'{sign}${abs(value):,.0f}'
+
+
+def format_percent(value):
+    """0.25 -> '25%'; keeps meaningful decimals (0.0625 -> '6.25%')."""
+    return f'{value * 100:g}%'
+
+
+def format_table_records(table_data):
+    """Snap the liability table's cells to the default currency/percent
+    style, leaving the label column and any unparseable cells as typed."""
+    cash_row, std_row = dict(table_data[0]), dict(table_data[1])
+    for col in cash_row:
+        if col == '':
+            continue
+        try:
+            cash_row[col] = format_currency(parse_currency(cash_row[col]))
+        except ValueError:
+            pass
+        try:
+            std_row[col] = format_percent(parse_percent(std_row[col]))
+        except ValueError:
+            pass
+    return [cash_row, std_row]
+
+
 def irr(cash_flows):
     """IRR of a cash-flow series (t = 0, 1, 2, ...).
 

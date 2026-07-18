@@ -16,3 +16,21 @@
     background-color: #C1C9D2;
     border-radius: 4px;
 }
+
+/* Make the clicked liability cell unmistakably editable: a pulsing
+   accent outline plus a visible text caret while typing. Both selectors
+   cover the cell-focus class names used across DataTable versions. */
+#dash-liab-table td.cell--selected,
+#dash-liab-table td.dash-cell.focused {
+    animation: liab-cell-pulse 1.2s ease-in-out infinite;
+}
+
+#dash-liab-table td.cell--selected input.dash-cell-value,
+#dash-liab-table td.dash-cell.focused input.dash-cell-value {
+    caret-color: #2C3E50;
+}
+
+@keyframes liab-cell-pulse {
+    0%, 100% { box-shadow: inset 0 0 0 2px #3498DB; }
+    50%      { box-shadow: inset 0 0 0 2px rgba(52, 152, 219, 0.2); }
+}

@@ -198,15 +198,22 @@ def update_graph(value, s_value):
         color_discrete_sequence=["blue", "orange", "forestgreen",
                                  "lightslategrey", "limegreen"])
 
+    # Only Arithmetic Mean Surplus and Risk Premium get legend entries
+    # (their right-edge annotations crowded the other labels); every other
+    # curve is identified by an annotation instead.
+    figure.update_traces(showlegend=False)
+    figure.update_traces(showlegend=True, name='Arithmetic Mean Surplus',
+                         selector=dict(name='arithmetic mean surplus'))
+
     figure.add_scatter(
         mode='markers', x=[optimized_vol], y=[optimized_ret],
         marker=dict(color='blue', size=8, symbol='diamond'),
-        name='Optimized EF Portfolio').update(layout_showlegend=False)
+        name='Optimized EF Portfolio', showlegend=False)
     figure.add_scatter(
         mode='markers', x=[optimized_vol], y=[optimized_surplus],
         marker=dict(color='forestgreen', size=8, symbol='diamond'),
-        name='Optimized Risk-Adjusted Surplus (nearest discrete portfolio)'
-    ).update(layout_showlegend=False)
+        name='Optimized Risk-Adjusted Surplus (nearest discrete portfolio)',
+        showlegend=False)
 
     # Overlay the compounded-and-annualized mean surplus and the risk premium
     # (the 95% confidence buffer in excess of the mean surplus), both in
@@ -214,37 +221,33 @@ def update_graph(value, s_value):
     figure.add_scatter(x=mean_surplus_z['targetvols'],
                        y=mean_surplus_z['Output Mean Surplus (x 100)'],
                        mode='lines', name='Mean Surplus over Time Horizon',
-                       line=dict(color='crimson', dash='dash'))
+                       line=dict(color='crimson', dash='dash'),
+                       showlegend=False)
     figure.add_scatter(x=mean_surplus_z['targetvols'],
                        y=mean_surplus_z['Output Risk Premium (x 100)'],
                        mode='lines', name='Risk Premium',
-                       line=dict(color='teal', dash='dash'))
+                       line=dict(color='#0097A7', dash='dash'),
+                       showlegend=True)
 
     ef_text = "Efficient Frontier* (µ="+str(optimized_ret) + \
         "%, σ="+str(optimized_vol)+"%)"
     # All labels except the Efficient Frontier's sit at the right end of
-    # their curve (this figure's legend is hidden, so each curve is
-    # identified by an annotation instead). Several curves can end at
-    # nearly the same height, so after sorting the labels by y, any label
-    # closer than min_gap to the one below is pushed up; the matching
-    # colors keep each label attributable to its curve.
+    # their curve (Arithmetic Mean Surplus and Risk Premium live in the
+    # legend below the plot instead). Several curves can end at nearly the
+    # same height, so after sorting the labels by y, any label closer than
+    # min_gap to the one below is pushed up; the matching colors keep each
+    # label attributable to its curve.
     right_edge = mean_surplus_z.iloc[-1]
     right_vol = float(right_edge['targetvols'])
-    right_ret = float(efport['targetrets'].iloc[-1])
     edge_labels = [
         dict(y=float(right_edge['Output Risk Adjusted Surplus (x 100)']),
              text='<b>Optimized Risk-Adjusted Surplus</b>',
              font=dict(size=11, color='forestgreen')),
         dict(y=float(value), text='Mean Liability Discount Rate',
              font=dict(size=10, color='orange')),
-        dict(y=right_ret-value, text='Arithmetic Mean Surplus',
-             font=dict(size=10, color='limegreen')),
         dict(y=float(right_edge['Output Mean Surplus (x 100)']),
              text='Mean Surplus over Time Horizon',
              font=dict(size=10, color='crimson')),
-        dict(y=float(right_edge['Output Risk Premium (x 100)']),
-             text='Risk Premium',
-             font=dict(size=10, color='teal')),
     ]
     edge_labels.sort(key=lambda label: label['y'])
     # ~a label's height in y-data units: all plotted series set the span
@@ -263,8 +266,8 @@ def update_graph(value, s_value):
     for label in edge_labels:
         figure.add_annotation(showarrow=False, x=right_vol, xanchor='right',
                               yanchor='bottom', yshift=3, **label)
-    figure.update_layout(legend=dict(
-        yanchor="bottom", y=0.01, xanchor="left", x=0.15))
+    figure.update_layout(legend_title_text=None, legend=dict(
+        orientation="h", yanchor="top", y=-0.15, xanchor="center", x=0.5))
 
     # --- Implied utility figure (lower half of the frontier, through ~12% vol)
     utility_df = pd.DataFrame(

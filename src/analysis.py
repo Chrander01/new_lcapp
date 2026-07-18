@@ -198,9 +198,10 @@ def update_graph(value, s_value):
         color_discrete_sequence=["blue", "orange", "forestgreen",
                                  "lightslategrey", "limegreen"])
 
-    # Only Arithmetic Mean Surplus and Risk Premium get legend entries
-    # (their right-edge annotations crowded the other labels); every other
-    # curve is identified by an annotation instead.
+    # Only Arithmetic Mean Surplus, Mean Surplus over Time Horizon, and
+    # Risk Premium get legend entries (their right-edge annotations
+    # crowded the other labels); every other curve is identified by an
+    # annotation instead.
     figure.update_traces(showlegend=False)
     figure.update_traces(showlegend=True, name='Arithmetic Mean Surplus',
                          selector=dict(name='arithmetic mean surplus'))
@@ -222,7 +223,7 @@ def update_graph(value, s_value):
                        y=mean_surplus_z['Output Mean Surplus (x 100)'],
                        mode='lines', name='Mean Surplus over Time Horizon',
                        line=dict(color='crimson', dash='dash'),
-                       showlegend=False)
+                       showlegend=True)
     figure.add_scatter(x=mean_surplus_z['targetvols'],
                        y=mean_surplus_z['Output Risk Premium (x 100)'],
                        mode='lines', name='Risk Premium',
@@ -231,41 +232,27 @@ def update_graph(value, s_value):
 
     ef_text = "Efficient Frontier* (µ="+str(optimized_ret) + \
         "%, σ="+str(optimized_vol)+"%)"
-    # All labels except the Efficient Frontier's sit at the right end of
-    # their curve (Arithmetic Mean Surplus and Risk Premium live in the
-    # legend below the plot instead). Several curves can end at nearly the
-    # same height, so after sorting the labels by y, any label closer than
-    # min_gap to the one below is pushed up; the matching colors keep each
-    # label attributable to its curve.
-    right_edge = mean_surplus_z.iloc[-1]
-    right_vol = float(right_edge['targetvols'])
-    edge_labels = [
-        dict(y=float(right_edge['Output Risk Adjusted Surplus (x 100)']),
-             text='<b>Optimized Risk-Adjusted Surplus</b>',
-             font=dict(size=11, color='forestgreen')),
-        dict(y=float(value), text='Mean Liability Discount Rate',
-             font=dict(size=10, color='orange')),
-        dict(y=float(right_edge['Output Mean Surplus (x 100)']),
-             text='Mean Surplus over Time Horizon',
-             font=dict(size=10, color='crimson')),
-    ]
-    edge_labels.sort(key=lambda label: label['y'])
-    # ~a label's height in y-data units: all plotted series set the span
-    plotted_ys = pd.concat([
-        dff_graph['targetrets'],
-        mean_surplus_z['Output Mean Surplus (x 100)'],
-        mean_surplus_z['Output Risk Premium (x 100)'],
-    ])
-    min_gap = 0.05 * float(plotted_ys.max() - plotted_ys.min())
-    for below, label in zip(edge_labels, edge_labels[1:]):
-        label['y'] = max(label['y'], below['y'] + min_gap)
-
+    # The dashed overlays (Arithmetic Mean Surplus, Mean Surplus over Time
+    # Horizon, Risk Premium) live in the legend below the plot; the
+    # remaining curves are labeled by annotations. The Efficient Frontier
+    # label sits above its curve at the optimal portfolio, and the
+    # Optimized Risk-Adjusted Surplus label mirrors it below the surplus
+    # curve's peak at the same x — yanchor plus a pixel yshift keeps a
+    # fixed screen-space gap from the line at any zoom. The Mean Liability
+    # Discount Rate label stays at the right end of its flat line.
+    right_vol = float(mean_surplus_z['targetvols'].iloc[-1])
     figure.add_annotation(showarrow=False, x=optimized_vol, y=optimized_ret,
                           text=ef_text, yanchor='bottom', yshift=10,
                           font=dict(size=11, color='blue'))
-    for label in edge_labels:
-        figure.add_annotation(showarrow=False, x=right_vol, xanchor='right',
-                              yanchor='bottom', yshift=3, **label)
+    figure.add_annotation(showarrow=False, x=optimized_vol,
+                          y=optimized_surplus,
+                          text='Optimized Risk-Adjusted Surplus',
+                          yanchor='top', yshift=-16,
+                          font=dict(size=11, color='forestgreen'))
+    figure.add_annotation(showarrow=False, x=right_vol, xanchor='right',
+                          y=float(value), text='Mean Liability Discount Rate',
+                          yanchor='bottom', yshift=3,
+                          font=dict(size=10, color='orange'))
     figure.update_layout(legend_title_text=None, legend=dict(
         orientation="h", yanchor="top", y=-0.15, xanchor="center", x=0.5))
 

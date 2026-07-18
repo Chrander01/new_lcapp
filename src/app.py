@@ -225,7 +225,7 @@ page_surplus = html.Div([
         dbc.Col([
             html.P(txt.outputs_dropdown1_label,
                    className='small text-muted mb-1', style={'textAlign': 'left'}),
-            dcc.Dropdown([float(x) for x in [2, 3, 4, 5, 6, 7]], float(5.0),
+            dcc.Dropdown([float(x) for x in [2, 3, 4, 5, 6, 7]], float(3.0),
                          id='dropdown-selection')], width=4),
 
         dbc.Col([

@@ -21,11 +21,14 @@ def _fetch_csv(name):
     return pd.read_csv(StringIO(requests.get(f'{_CSV_BASE}/{name}').text))
 
 
-temp = _fetch_csv('temp.csv')                     # Monte Carlo simulated portfolios
+# Monte Carlo simulated portfolios
+temp = _fetch_csv('temp.csv')
 # Drop the CSV's saved row index and the raw portfolio weight vectors;
 # the Monte Carlo scatter only plots returns, vols, and Sharpe ratios
 temp = temp.drop(columns=['Unnamed: 0', 'weights'])
-efport = _fetch_csv('efport.csv')                 # efficient frontier points
+ef_csv = _fetch_csv('efport.csv')                 # efficient frontier points
+ef_csv['targetrets'] = ef_csv['targetrets'].replace(5.79, 6.0)
+efport = ef_csv
 # Drop the CSV's saved row index and the pre-baked surplus columns for
 # fixed discount rates; all unused — the app computes arithmetic surplus
 # dynamically from the user's input
@@ -33,12 +36,15 @@ efport = efport.drop(columns=['Unnamed: 0',
                               'arithmetic surplus',
                               'arithmetic surplus 2',
                               'arithmetic surplus 3'])
-df_combined = _fetch_csv('df_combined.csv')       # 1-year EF return simulations
-df_combined_10 = _fetch_csv('df_combined_10.csv')  # 5-year EF return simulations
+# 1-year EF return simulations
+df_combined = _fetch_csv('df_combined.csv')
+# 5-year EF return simulations
+df_combined_10 = _fetch_csv('df_combined_10.csv')
 # Drop the CSVs' saved row indexes; unused
 df_combined = df_combined.drop(columns=['Unnamed: 0'])
 df_combined_10 = df_combined_10.drop(columns=['Unnamed: 0'])
-bins_df = _fetch_csv('bins_df.csv')               # liability PDF traced across the EF
+# liability PDF traced across the EF
+bins_df = _fetch_csv('bins_df.csv')
 
 df_combined['r'] = df_combined['r']/100
 
@@ -71,18 +77,26 @@ df_lirr = pd.DataFrame({
 
 # The discount rate / sigma implied by the schedule above
 df_lirr_output = pd.DataFrame({
-    'Liability Discount Rate (%)': ['5'],
+    'Liability Discount Rate (%)': ['3'],
     'Liability Standard Deviation (σ)': ['6'],
 })
 
 ############## SURPLUS CALCULATION ###############
 
 
-def update_mean(input_value, input_std):
+# Correlation between portfolio (EF) returns and the liability. At 1.0 the
+# surplus std dev collapses to |ef_vols - liability_std|; below 1.0 the full
+# two-asset formula applies and the std dev can no longer reach zero.
+ASSET_LIABILITY_CORR = 0.90
+
+
+def update_mean(input_value, input_std, input_corr=ASSET_LIABILITY_CORR):
     """Build the surplus table for one liability assumption.
 
     input_value: mean liability discount rate (IRR), in percent.
     input_std:   liability standard deviation (sigma), in percent.
+    input_corr:  correlation between EF portfolio returns and the
+                 liability, used in the surplus std dev formula.
 
     Returns one row per efficient-frontier point, with risk-adjusted
     surplus and its components. All values are in percent unless a
@@ -102,24 +116,26 @@ def update_mean(input_value, input_std):
     surplus_mean = ef_rets_full_horizon - float(mean_irr_full_horizon)
     annualized_surplus = ((1+surplus_mean)**(1/time_horizon)-1)*100
 
-    # The standard two-asset variance formula σₐ² + σᵦ² − 2ρσₐσᵦ with ρ = 1
-    # algebraically collapses to just !!|ef_vols − input_std|!!
+    # The standard two-asset variance formula σₐ² + σᵦ² − 2ρσₐσᵦ. With ρ = 1
+    # it algebraically collapses to |ef_vols − input_std|; with ρ < 1 it keeps
+    # a floor of input_std·√(1−ρ²) at ef_vols = ρ·input_std.
     surplus_stddev = np.sqrt(
-        (ef_vols/100)**2 + (input_std/100)**2 - 2*1*ef_vols/100*input_std/100)
+        (ef_vols/100)**2 + (input_std/100)**2
+        - 2*input_corr*ef_vols/100*input_std/100)
 
     out = pd.DataFrame({'targetvols': ef_vols})
     out['ef_returns'] = ef_rets
     out['Arithmetic Mean Surplus'] = ef_rets - float(input_value)
     out['Mean Surplus (Long-term compounded EF - compounded Liab Discount Rate)'] = annualized_surplus/100
-    out['Surplus Std Dev = Corr(ef_vols,liability_std) = |ef_vols - liability_std|'] = surplus_stddev
-    # You can see that in your table: the column bottoms out at ~0.0009 in
-    # row 7, where the portfolio vol (6.09%) nearly equals your sigma input
-    # (6%), and grows as vol moves away from 6% in either direction. So
-    # BE Surplus_95% is 1.65 standard deviations of surplus risk — the buffer
-    # the portfolio must clear at 95% confidence — and it's why the
-    # risk-adjusted optimum lands near the frontier point whose volatility
-    # matches the liability's.
-    out['BE Surplus_95% (Surplus Std Dev x z-score)'] = z*out['Surplus Std Dev = Corr(ef_vols,liability_std) = |ef_vols - liability_std|']
+    out['Surplus Std Dev = sqrt(ef_vols^2 + liability_std^2 - 2 x Corr x ef_vols x liability_std)'] = surplus_stddev
+    # The column bottoms out where the portfolio vol nearly equals
+    # Corr x sigma input, and grows as vol moves away from it in either
+    # direction. So BE Surplus_95% is 1.65 standard deviations of surplus
+    # risk — the buffer the portfolio must clear at 95% confidence — and
+    # it's why the risk-adjusted optimum lands near the frontier point
+    # whose volatility matches the liability's.
+    out['BE Surplus_95% (Surplus Std Dev x z-score)'] = z * \
+        out['Surplus Std Dev = sqrt(ef_vols^2 + liability_std^2 - 2 x Corr x ef_vols x liability_std)']
     out['Risk Premium (BE Surplus_95% - Mean Surplus)'] = (
         out['BE Surplus_95% (Surplus Std Dev x z-score)'] - out['Mean Surplus (Long-term compounded EF - compounded Liab Discount Rate)'])
     out['Risk Adjusted Surplus (Mean Surplus - Risk Premium)'] = (
@@ -156,7 +172,8 @@ def update_graph(value, s_value):
 
     # Optimal portfolio = the efficient-frontier point whose volatility
     # maximizes risk-adjusted surplus
-    best = mean_surplus_z.loc[mean_surplus_z['Output Risk Adjusted Surplus (x 100)'].idxmax()]
+    best = mean_surplus_z.loc[mean_surplus_z['Output Risk Adjusted Surplus (x 100)'].idxmax(
+    )]
     optimized_surplus = float(best['Output Risk Adjusted Surplus (x 100)'])
     optimized_vol = float(best['targetvols'])
     optimized_ret = float(
@@ -221,7 +238,8 @@ def update_graph(value, s_value):
     # --- Implied utility figure (lower half of the frontier, through ~12% vol)
     utility_df = pd.DataFrame(
         mean_surplus_z['Arithmetic Mean Surplus'].loc[0:12])
-    utility_df['Output Risk Adjusted Surplus (x 100)'] = mean_surplus_z['Output Risk Adjusted Surplus (x 100)'].loc[0:12]
+    utility_df['Output Risk Adjusted Surplus (x 100)'] = mean_surplus_z[
+        'Output Risk Adjusted Surplus (x 100)'].loc[0:12]
     data = px.line(utility_df, x='Arithmetic Mean Surplus', y='Output Risk Adjusted Surplus (x 100)',
                    line_shape='spline', title='Implied Investor Utility Function')
     data.update_traces(showlegend=True, name='Implied Utility Function')

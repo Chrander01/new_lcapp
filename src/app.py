@@ -4,7 +4,7 @@ All data loading and surplus calculations live in analysis.py; this
 module only builds what the user sees.
 """
 
-from dash import Dash, html, dcc, Output, Input, no_update
+from dash import Dash, html, dcc, Output, Input, State, ctx, no_update
 from dash import dash_table as dt
 import dash_bootstrap_components as dbc
 import plotly.express as px
@@ -101,27 +101,36 @@ TABLE_STYLE_HEADER = {
     'textAlign': 'center',
 }
 
-# Monte Carlo IRR of the default schedule; these seed the liability
-# store (and so the Outputs page) until the user edits the Step 1 table
-DEFAULT_LIAB_IRR, DEFAULT_LIAB_SIGMA = table_irr(df_lirr.to_dict('records'))
+# Default liability schedule and its Monte Carlo IRR; these seed the two
+# liability stores (and so the Outputs page) until the user commits an
+# edited schedule with the Calculate button
+DEFAULT_LIAB_ROWS = df_lirr.to_dict('records')
+DEFAULT_LIAB_IRR, DEFAULT_LIAB_SIGMA = table_irr(DEFAULT_LIAB_ROWS)
 
 # Editable: the user can overwrite any cash flow or standard deviation
-# (the row-label column stays fixed); the Monte Carlo IRR table below
-# recalculates from whatever is entered. Memory persistence keeps edits
-# across page navigation but resets them on reload, matching the store.
+# (the row-label column stays fixed), then commit with Calculate. The
+# table has no persistence of its own — it is refilled from the
+# liability-inputs-store whenever the page mounts, so uncommitted edits
+# are discarded on navigation and the committed schedule is always the
+# one driving the model.
 dash_liab_table = dt.DataTable(
-    df_lirr.to_dict('records'),
+    DEFAULT_LIAB_ROWS,
     [{"name": i, "id": i, "editable": i != ''} for i in df_lirr.columns],
     id='dash-liab-table',
     editable=True,
-    persistence=True,
-    persisted_props=['data'],
-    persistence_type='memory',
     style_table=TABLE_STYLE_TABLE,
     style_cell=TABLE_STYLE_CELL,
     style_header=TABLE_STYLE_HEADER,
     style_cell_conditional=[
         {'if': {'column_id': ''}, 'textAlign': 'left', 'fontWeight': 'bold'},
+    ],
+    # Editable cells get a form-field look (bordered, tinted, text cursor)
+    # so it's obvious they are inputs, unlike the flat read-only tables
+    style_data_conditional=[
+        {'if': {'column_editable': True},
+         'backgroundColor': '#F0F7FC',
+         'border': '1px solid #B8D4E8',
+         'cursor': 'text'},
     ],
 )
 
@@ -196,7 +205,18 @@ page_liability = html.Div([
     html.Hr(className='mt-2 mb-4'),
     paper_attribution,
     dbc.Row([
-        dbc.Col([dash_liab_table], width=12),
+        dbc.Col([
+            html.P(txt.liability_edit_hint,
+                   className='small text-muted mb-2',
+                   style={'textAlign': 'left'}),
+            dash_liab_table,
+            dbc.Button(txt.liability_calc_label, id='calc-liab-button',
+                       color='primary', size='sm',
+                       className='mt-2 me-2'),
+            dbc.Button(txt.liability_reset_label, id='reset-liab-button',
+                       color='secondary', outline=True, size='sm',
+                       className='mt-2'),
+        ], width=12),
     ], className='mb-4'),
     dbc.Row([
         dbc.Col([dash_lirr_table], width=6),
@@ -328,12 +348,16 @@ sidebar = html.Div(
 
 content = html.Div(id="page-content", style=CONTENT_STYLE)
 
-# The liability store is the single driving variable of the model: the
-# Step 1 table writes the simulated IRR mean/sigma here, and the Outputs
-# page reads it to build the surplus figures. It lives in the root
-# layout so it survives page navigation.
+# The two liability stores live in the root layout so they survive page
+# navigation and are the single source of truth for the whole model:
+#   liability-inputs-store — the committed cash-flow schedule (the Step 1
+#     table is refilled from it on every page mount; Calculate and Reset
+#     are the only writers, so stale or half-finished edits never leak)
+#   liability-store — the simulated IRR mean/sigma of that schedule,
+#     which drives the Outputs-page surplus figures
 app.layout = html.Div([
     dcc.Location(id="url"),
+    dcc.Store(id='liability-inputs-store', data=DEFAULT_LIAB_ROWS),
     dcc.Store(id='liability-store',
               data={'irr': DEFAULT_LIAB_IRR, 'sigma': DEFAULT_LIAB_SIGMA}),
     sidebar,
@@ -362,21 +386,38 @@ def render_page_content(pathname):
     )
 
 
-@app.callback([Output('dash-lirr-table', 'data'),
-               Output('liability-store', 'data')],
-              Input('dash-liab-table', 'data'))
-def update_liability_irr(rows):
-    """Re-run the Monte Carlo IRR whenever a liability cell is edited,
-    updating both the Step 1 output table and the app-wide store.
+@app.callback(Output('dash-liab-table', 'data'),
+              Input('liability-inputs-store', 'data'))
+def load_liability_table(rows):
+    """Fill the Step 1 table from the committed schedule whenever the
+    page mounts or the schedule changes (Calculate/Reset), discarding
+    any on-screen edits that were never calculated."""
+    return rows
 
-    Half-typed values (e.g. '-$' or '2%x') won't parse; keep showing the
-    last good result until the cell is a valid number again.
+
+@app.callback([Output('liability-inputs-store', 'data'),
+               Output('dash-lirr-table', 'data'),
+               Output('liability-store', 'data')],
+              [Input('calc-liab-button', 'n_clicks'),
+               Input('reset-liab-button', 'n_clicks')],
+              State('dash-liab-table', 'data'),
+              prevent_initial_call=True)
+def commit_liability_inputs(_calc, _reset, rows):
+    """Calculate commits the on-screen schedule and re-runs the Monte
+    Carlo IRR; Reset commits the default schedule instead. Committing
+    updates the inputs store (refilling the table, which flushes any
+    stale edits), the Step 1 output table, and the liability store that
+    drives the Outputs-page figures.
+
+    Unparseable values (e.g. '-$' or '2%x') leave everything unchanged.
     """
+    if ctx.triggered_id == 'reset-liab-button':
+        rows = DEFAULT_LIAB_ROWS
     try:
         mean_irr, std_irr = table_irr(rows)
     except (ValueError, TypeError, IndexError, KeyError):
-        return no_update, no_update
-    return (irr_output_records(mean_irr, std_irr),
+        return no_update, no_update, no_update
+    return (rows, irr_output_records(mean_irr, std_irr),
             {'irr': mean_irr, 'sigma': std_irr})
 
 

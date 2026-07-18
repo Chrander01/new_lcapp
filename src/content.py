@@ -42,10 +42,20 @@ outputs_utility_body = "After a model for risk-adjusted surplus was formulated, 
 
 liability_header = 'Tracing the Liability Distribution'
 
+liability_edit_hint = ('The shaded cells below are inputs: click one and type to change a cash '
+                       'flow or its standard deviation, then press Calculate to run the Monte '
+                       'Carlo and update everything downstream — the simulated discount rate '
+                       'below and the Outputs-page optimization. Reset restores the default '
+                       'schedule. Edits are not applied (and are discarded when you leave the '
+                       'page) until you press Calculate.')
+
+liability_calc_label = 'Calculate'
+liability_reset_label = 'Reset to Default Inputs'
+
 liability_table_hint = ('<-- IRR of the cash flows above, simulated with each flow varied by its '
-                        'standard deviation (Monte Carlo, n=1,000). Edit any cell in the table '
-                        'above to recalculate. These flow through to the Outputs tab as the '
-                        'liability discount rate and σ driving the surplus optimization.')
+                        'standard deviation (Monte Carlo, n=1,000). Edit the table above and '
+                        'press Calculate to refresh. These flow through to the Outputs tab as '
+                        'the liability discount rate and σ driving the surplus optimization.')
 
 liability_horizon_title = 'Time Horizon Impacts on Efficient Frontier'
 liability_horizon_body = 'The duration of liabilities is matched to the duration of the assets. In this case, we are using an equivalent total of 5 years for each. This has an important impact on the efficient frontier given an increased time horizon has the effect of increasing the probability of a positive outcome over the total period. This can be observed, visually, by the amount of observations that land above the point of zero returns as the time horizon increases (i.e., in the graph on the right). This is also an area where the model complexity could be increased in order to more realistically match time horizon effects. For example, a weighting of the dollar duration of liabilities might be more precise or even more interestingly, multi-period optimizations, such as dynamic programming. However, this paper focuses on the methodology of combining asset and liability returns rather than fine tuning the liability calculations. In addition, there has been substantial research in the fields of dynamic programming that could likely be applied to extend this model.'

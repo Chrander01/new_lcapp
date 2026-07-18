@@ -192,22 +192,29 @@ def update_graph(value, s_value):
 
     ef_text = "Efficient Frontier* (µ="+str(optimized_ret) + \
         "%, σ="+str(optimized_vol)+"%)"
+    # All labels except the Efficient Frontier's sit at the right end of
+    # their curve (this figure's legend is hidden, so each curve is
+    # identified by an annotation instead)
+    right_edge = mean_surplus_z.iloc[-1]
+    right_vol = float(right_edge['targetvols'])
+    right_ret = float(efport['targetrets'].iloc[-1])
     annotations = [
-        dict(y=optimized_ret, text=ef_text,
+        dict(x=optimized_vol, y=optimized_ret, text=ef_text,
              yanchor='bottom', yshift=10, font=dict(size=11, color='blue')),
-        dict(y=optimized_surplus, text='<b>Optimized Risk-Adjusted Surplus</b>',
-             yanchor='middle', xanchor='left', xshift=20, yshift=-3,
+        dict(x=right_vol,
+             y=float(right_edge['Output Risk Adjusted Surplus (x 100)']),
+             text='<b>Optimized Risk-Adjusted Surplus</b>',
+             xanchor='right', yanchor='bottom', yshift=3,
              font=dict(size=11, color='forestgreen')),
-        dict(y=value, text='Mean Liability Discount Rate',
-             yanchor='bottom', xanchor='left', xshift=50,
+        dict(x=right_vol, y=value, text='Mean Liability Discount Rate',
+             xanchor='right', yanchor='bottom', yshift=3,
              font=dict(size=10, color='orange')),
-        dict(y=optimized_ret-value, text='Arithmetic Mean Surplus',
-             yanchor='bottom', xanchor='left', xshift=3, yshift=13,
+        dict(x=right_vol, y=right_ret-value, text='Arithmetic Mean Surplus',
+             xanchor='right', yanchor='bottom', yshift=3,
              font=dict(size=10, color='limegreen')),
     ]
     for ann in annotations:
-        figure.add_annotation(x=optimized_vol, showarrow=False,
-                              arrowhead=1, **ann)
+        figure.add_annotation(showarrow=False, arrowhead=1, **ann)
     figure.update_layout(legend=dict(
         yanchor="bottom", y=0.01, xanchor="left", x=0.15))
 

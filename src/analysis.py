@@ -207,6 +207,18 @@ def update_graph(value, s_value):
         name='Optimized Risk-Adjusted Surplus (nearest discrete portfolio)'
     ).update(layout_showlegend=False)
 
+    # Overlay the compounded-and-annualized mean surplus and the risk premium
+    # (the 95% confidence buffer in excess of the mean surplus), both in
+    # percent, dashed to set them apart from the primary curves
+    figure.add_scatter(x=mean_surplus_z['targetvols'],
+                       y=mean_surplus_z['Output Mean Surplus (x 100)'],
+                       mode='lines', name='Mean Surplus over Time Horizon',
+                       line=dict(color='crimson', dash='dash'))
+    figure.add_scatter(x=mean_surplus_z['targetvols'],
+                       y=mean_surplus_z['Output Risk Premium (x 100)'],
+                       mode='lines', name='Risk Premium',
+                       line=dict(color='teal', dash='dash'))
+
     ef_text = "Efficient Frontier* (µ="+str(optimized_ret) + \
         "%, σ="+str(optimized_vol)+"%)"
     # All labels except the Efficient Frontier's sit at the right end of
@@ -229,6 +241,16 @@ def update_graph(value, s_value):
         dict(x=right_vol, y=right_ret-value, text='Arithmetic Mean Surplus',
              xanchor='right', yanchor='bottom', yshift=3,
              font=dict(size=10, color='limegreen')),
+        dict(x=right_vol,
+             y=float(right_edge['Output Mean Surplus (x 100)']),
+             text='Mean Surplus over Time Horizon',
+             xanchor='right', yanchor='bottom', yshift=3,
+             font=dict(size=10, color='crimson')),
+        dict(x=right_vol,
+             y=float(right_edge['Output Risk Premium (x 100)']),
+             text='Risk Premium',
+             xanchor='right', yanchor='bottom', yshift=3,
+             font=dict(size=10, color='teal')),
     ]
     for ann in annotations:
         figure.add_annotation(showarrow=False, arrowhead=1, **ann)
